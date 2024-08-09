@@ -1,9 +1,11 @@
 """
 Coefficient Diagram Method (CDM) Toolbox by Python
 
-Created on Wed Aug  7 20:47:12 2024
+@author: Rui Hirokawa
 
-@author: ruihi
+[1] Shunji Manabe, Young Chol Kim, 
+Coefficient Diagram Method for Control System Design, 
+Springer, 2021
 """
 
 import numpy as np
@@ -12,6 +14,7 @@ import matplotlib.pyplot as plt
 
 
 def get_coeff(F):
+    """get coefficient and non-zero index"""
     F_ = F.num[0][0]
     idx = np.arange(len(F_)-1, -1, -1)
     idx_z = np.where(F_ == 0)[0]
@@ -23,6 +26,7 @@ def get_coeff(F):
 
 
 def get_idx(P):
+    """Returns coefficients, stability index, time constant"""
     a = P.num[0][0]
     nt = len(a)
 
@@ -42,11 +46,52 @@ def get_idx(P):
 
 
 def c2g(Ap, Ac, Bp, Bc, Ba=None):
+    """Returns coefficients, stability index, time constant
+
+    Parameters:
+    ----------
+    Ap : transfer function
+        numerator part of transfer function for plant
+    Bp : transfer function
+        denominator part of transfer function for plant
+    Ac : transfer function
+        numerator part of transfer function for controller
+    Bc : transfer function
+        denominator part of transfer function for controller
+    Ap : transfer function
+        numerator part of transfer function for pre-filter
+
+    Returns:
+    ----------
+    a : array
+        coefficient of characsteric polynomials
+    gam : array
+        stability index
+    tau : float
+        time constant
+    gams : array
+        limit of stability index
+
+    """
     P = Ap*Ac+Bp*Bc
     a, gam, tau, gams = get_idx(P)
 
+    return a, gam, tau, gams
+
 
 def cdia(P, opt_p=[], leg_opt_p=[]):
+    """Plot coefficient diagram
+
+    Parameters:
+    ----------
+    P : transfer function
+        characsteric polynomial.
+    opt_p : array of transfer function (option)
+        list of transfer function to be shown in CDM.
+    leg_opt_p : array of string (option)
+        list of name of transfer function.
+
+    """
     a, gam, tau, gams = get_idx(P)
 
     nt = len(a)
@@ -84,6 +129,37 @@ def cdia(P, opt_p=[], leg_opt_p=[]):
 
 
 def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
+    """Returns controller based on the order of controller.
+
+    Returns coefficients, stability index, time constant
+
+    Parameters:
+    ----------
+    Ap : transfer function
+        numerator part of transfer function for plant
+    Bp : transfer function
+        denominator part of transfer function for plant
+    nc : int
+        order of numerator part of controller
+    mc : int
+        order of denominator part of controller
+    gr : array
+        stability index
+    tau : float
+        time constant
+    nd : int (option)
+        index of denominator of controoler to normalize
+
+    Returns:
+    ----------
+    P: transfer function
+        characteristic polynomials
+    Ac : transfer function
+        numerator part of transfer function for controller
+    Bc : transfer function
+        denominator part of transfer function for controller
+    """
+
     s = ct.tf('s')
 
     ng = len(gr)
@@ -124,7 +200,7 @@ def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
     # normalize l_nd in controller
     l0 = d[nc-nd]
     Ac = ct.tf(d[0:nc+1]/l0, [1])
-    Bc = ct.tf(d[3:]/l0, [1])
+    Bc = ct.tf(d[nc+1:]/l0, [1])
 
     P = Ap*Ac+Bp*Bc
 
@@ -132,7 +208,25 @@ def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
 
 
 def g2t(Ap, Bp, nc, mc, gr):
-    """
+    """Returns reference time constant to realized stability index
+
+    Parameters:
+    ----------
+    Ap : transfer function
+        numerator part of transfer function for plant
+    Bp : transfer function
+        denominator part of transfer function for plant
+    nc : int
+        order of numerator part of controller
+    mc : int
+        order of denominator part of controller
+    gr : array
+        reference stability index
+
+    Returns:
+    ----------
+    tau : array
+        candidates of reference time constant
     """
 
     s = ct.tf('s')
