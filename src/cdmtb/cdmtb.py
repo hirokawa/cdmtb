@@ -128,7 +128,7 @@ def cdia(P, opt_p=[], leg_opt_p=[]):
     plt.show()
 
 
-def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
+def g2c(Ap, Bp, nc: int, mc: int, gr, taur: float, nd=0):
     """Returns controller based on the order of controller.
 
     Returns coefficients, stability index, time constant
@@ -207,7 +207,7 @@ def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
     return P, Ac, Bc
 
 
-def g2t(Ap, Bp, nc, mc, gr):
+def g2t(Ap, Bp, nc: int, mc: int, gr):
     """Returns reference time constant to realized stability index
 
     Parameters:
