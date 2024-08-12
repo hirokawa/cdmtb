@@ -35,12 +35,15 @@ def get_idx(P):
         gam[-1-i] = a[i+1]**2/(a[i]*a[i+2])
     tau = a[-2]/a[-1]
 
-    gams = np.zeros(nt-2)
-    gams[0] = 1/gam[1]
-    gams[-1] = 1/gam[-2]
+    if nt > 3:
+        gams = np.zeros(nt-2)
+        gams[0] = 1/gam[1]
+        gams[-1] = 1/gam[-2]
 
-    for i in range(1, nt-3):
-        gams[i] = 1/gam[i-1]+1/gam[i+1]
+        for i in range(1, nt-3):
+            gams[i] = 1/gam[i-1]+1/gam[i+1]
+    else:
+        gams = []
 
     return a, gam, tau, gams
 
@@ -101,14 +104,17 @@ def cdia(P, opt_p=[], leg_opt_p=[]):
 
     ax[0].semilogy(idx, a, 'b.-', label='P(s)')
     ax[0].set_xlim([-0.2, nt-0.8])
+    ax[0].set_xticks(np.arange(0, nt))
     ax[0].invert_xaxis()
     ax[0].grid()
     ax[0].set_ylabel('coefficient')
     ax[0].set_title('$\\tau$={:.3f}[s]'.format(tau))
 
     ax[1].plot(np.arange(1, nt-1), gam, 'b.-', label='$\\gamma$')
-    ax[1].plot(np.arange(1, nt-1), gams, 'r.--', label='$\\gamma^*$')
+    if len(gams) > 0:
+        ax[1].plot(np.arange(1, nt-1), gams, 'r.--', label='$\\gamma^*$')
     ax[1].set_xlim([-0.2, nt-0.8])
+    ax[1].set_xticks(np.arange(0, nt))
     ax[1].invert_xaxis()
     ax[1].set_ylim([0, np.ceil(np.max(gam)+1)])
     ax[1].grid()
@@ -128,7 +134,30 @@ def cdia(P, opt_p=[], leg_opt_p=[]):
     plt.show()
 
 
-def g2c(Ap, Bp, nc: int, mc: int, gr, taur: float, nd=0):
+def aref(gr, taur):
+    """Returns coefficients of reference characteristic polynomial
+
+    Parameters:
+    ----------
+    gr : array
+        reference stability index
+    taur : array
+        candidates of reference time constant
+
+    Returns:
+    ----------
+    ar: array
+        coefficients of reference characteristic polynomial
+    """
+
+    ng = len(gr)
+    v = np.cumprod(np.cumprod(gr))
+    eta = 1/np.flip(v)
+    ar = np.r_[taur ** np.arange(ng+1, 1, -1)*eta, taur, 1]
+    return ar
+
+
+def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
     """Returns controller based on the order of controller.
 
     Returns coefficients, stability index, time constant
@@ -161,11 +190,7 @@ def g2c(Ap, Bp, nc: int, mc: int, gr, taur: float, nd=0):
     """
 
     s = ct.tf('s')
-
-    ng = len(gr)
-    v = np.cumprod(np.cumprod(gr))
-    eta = 1/np.flip(v)
-    ar = np.r_[taur ** np.arange(ng+1, 1, -1)*eta, taur, 1]
+    ar = aref(gr, taur)
 
     if type(Ap) is int:
         Ap = s*0+Ap
@@ -207,7 +232,7 @@ def g2c(Ap, Bp, nc: int, mc: int, gr, taur: float, nd=0):
     return P, Ac, Bc
 
 
-def g2t(Ap, Bp, nc: int, mc: int, gr):
+def g2t(Ap, Bp, nc, mc, gr):
     """Returns reference time constant to realized stability index
 
     Parameters:
