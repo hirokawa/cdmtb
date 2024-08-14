@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024-present Rui Hirokawa <rui.hirokawa@gmail.com>
+# SPDX-FileCopyrightText: 2024-present Rui Hirokawa
 #
 # SPDX-License-Identifier: MIT
-__version__ = "0.2.1"
+__version__ = "0.2.2"

@@ -3,8 +3,8 @@ Coefficient Diagram Method (CDM) Toolbox by Python
 
 @author: Rui Hirokawa
 
-[1] Shunji Manabe, Young Chol Kim, 
-Coefficient Diagram Method for Control System Design, 
+[1] Shunji Manabe, Young Chol Kim,
+Coefficient Diagram Method for Control System Design,
 Springer, 2021
 """
 
@@ -166,12 +166,12 @@ def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
     ----------
     Ap : transfer function
         numerator part of transfer function for plant
-    Bp : transfer function
+    Bp : transfer function or list of transfer function
         denominator part of transfer function for plant
     nc : int
-        order of numerator part of controller
-    mc : int
-        order of denominator part of controller
+        order of numerator part of controller Ac(s)
+    mc : int or array of int
+        order of denominator part of controller Bc(s)
     gr : array
         stability index
     tau : float
@@ -185,12 +185,14 @@ def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
         characteristic polynomials
     Ac : transfer function
         numerator part of transfer function for controller
-    Bc : transfer function
+    Bc : transfer function or list of transfer function
         denominator part of transfer function for controller
     """
 
     s = ct.tf('s')
+
     ar = aref(gr, taur)
+    ng = len(gr)
 
     if type(Ap) is int:
         Ap = s*0+Ap
@@ -198,23 +200,51 @@ def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
     if type(Bp) is int:
         Bp = s*0+Bp
 
+    if type(Bp) is list:
+        mp_ = []
+        mpd = len(Bp)
+        for k in range(mpd):
+            if type(Bp[k]) is int:
+                Bp[k] = s*0+Bp[k]
+            cf_bp = Bp[k].num[0][0]
+            mp_.append(len(cf_bp)-1)
+    else:
+        mpd = 1
+        cf_bp = Bp.num[0][0]
+        mp_ = len(cf_bp)-1
+
     cf_ap = Ap.num[0][0]
-    cf_bp = Bp.num[0][0]
-
     np_ = len(cf_ap)-1
-    mp_ = len(cf_bp)-1
 
-    nk = nc + mc + 2  # number of parameters
-    nt = max(np_+nc, mp_+mc)
+    if mpd == 1:
+        mct = mc
+        mcd = 1
+    else:
+        if len(mc) != mpd:
+            print("dimension mismatch for Bp and Bc.")
+        mct = sum(mc)
+        mcd = len(mc)
+
+    nk = (nc+1) + (mct+mcd)  # number of parameters
+    nt = max(np_+nc, np.max(np.array(mp_)+np.array(mc)))
     M = np.zeros((nk, nt+1))
 
     # sylvester equation
     for k in range(nc+1):
         M[k, k:k+np_+1] = cf_ap
 
-    for k in range(mc+1):
-        i0 = k+nt-(mc+mp_)
-        M[k+nc+1, i0:i0+mp_+1] = cf_bp
+    if mpd == 1:
+        for k in range(mc+1):
+            i0 = k+nt-(mc+mp_)
+            M[k+nc+1, i0:i0+mp_+1] = cf_bp
+    else:
+        k0 = 0
+        for j in range(mpd):
+            cf_bp = Bp[j].num[0][0]
+            for k in range(0, mc[j]+1):
+                i0 = k+nt-(mc[j]+mp_[j])
+                M[k+k0+nc+1, i0:i0+mp_[j]+1] = cf_bp
+            k0 += mc[j]+1
 
     i0 = nt+1-nk
     M = M[:, i0:i0+nk]
@@ -225,9 +255,18 @@ def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
     # normalize l_nd in controller
     l0 = d[nc-nd]
     Ac = ct.tf(d[0:nc+1]/l0, [1])
-    Bc = ct.tf(d[nc+1:]/l0, [1])
 
-    P = Ap*Ac+Bp*Bc
+    if mpd == 1:
+        Bc = ct.tf(d[nc+1:]/l0, [1])
+        P = Ap*Ac + Bp*Bc
+    else:
+        P = Ap*Ac
+        Bc = []
+        i0 = nc+1
+        for j in range(mpd):
+            Bc.append(ct.tf(d[i0:i0+mc[j]+1]/l0, [1]))
+            i0 += mc[j]+1
+            P += Bc[j]*Bp[j]
 
     return P, Ac, Bc
 
