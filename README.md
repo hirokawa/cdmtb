@@ -35,7 +35,7 @@ The sample of Python code:
 ```python
 import numpy as np
 import control as ct
-from cdmtb.cdmtb import cdia, g2c
+from cdmtb import cdia, g2c
 
 s = ct.tf('s')
 
