@@ -8,7 +8,7 @@ for Control System Design, Springer, 2021
 """
 import numpy as np
 import control as ct
-from cdmtb import cdia, g2c
+from cdmtb.cdmtb import cdia, g2c
 
 s = ct.tf('s')
 
