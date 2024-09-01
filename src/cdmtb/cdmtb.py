@@ -227,6 +227,7 @@ def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
 
     nk = (nc+1) + (mct+mcd)  # number of parameters
     nt = max(np_+nc, np.max(np.array(mp_)+np.array(mc)))
+
     M = np.zeros((nk, nt+1))
 
     # sylvester equation
@@ -247,10 +248,17 @@ def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
             k0 += mc[j]+1
 
     i0 = nt+1-nk
-    M = M[:, i0:i0+nk]
-    ak = ar[ng+2-nk:ng+2]
+    k0 = ng+2-nk
+
+    if k0 > 0 and i0 >= k0:
+        M = M[:, i0-1:i0+nk]
+        ak = ar[k0-1:k0+nk]
+    else:
+        M = M[:, i0:i0+nk]
+        ak = ar[k0:k0+nk]
 
     d = np.linalg.lstsq(M.T, ak, rcond=None)[0]
+    # d = np.linalg.solve(M.T, ak)
 
     # normalize l_nd in controller
     l0 = d[nc-nd]
@@ -271,7 +279,7 @@ def g2c(Ap, Bp, nc, mc, gr, taur, nd=0):
     return P, Ac, Bc
 
 
-def g2t(Ap, Bp, nc, mc, gr):
+def g2t(Ap, Bp, nc, mc, gr, tau_max=1e3):
     """Returns reference time constant to realized stability index
 
     Parameters:
@@ -281,9 +289,9 @@ def g2t(Ap, Bp, nc, mc, gr):
     Bp : transfer function
         denominator part of transfer function for plant
     nc : int
-        order of numerator part of controller
-    mc : int
-        order of denominator part of controller
+        order of numerator part of controller Ac(s)
+    mc : int or array of int
+        order of denominator part of controller Bc(s)
     gr : array
         reference stability index
 
@@ -294,6 +302,7 @@ def g2t(Ap, Bp, nc, mc, gr):
     """
 
     s = ct.tf('s')
+    ng = len(gr)
 
     if type(Ap) is int:
         Ap = s*0+Ap
@@ -301,38 +310,77 @@ def g2t(Ap, Bp, nc, mc, gr):
     if type(Bp) is int:
         Bp = s*0+Bp
 
+    if type(Bp) is list:
+        mp_ = []
+        mpd = len(Bp)
+        for k in range(mpd):
+            if type(Bp[k]) is int:
+                Bp[k] = s*0+Bp[k]
+            cf_bp = Bp[k].num[0][0]
+            mp_.append(len(cf_bp)-1)
+    else:
+        mpd = 1
+        cf_bp = Bp.num[0][0]
+        mp_ = len(cf_bp)-1
+
     cf_ap = Ap.num[0][0]
-    cf_bp = Bp.num[0][0]
-
     np_ = len(cf_ap)-1
-    mp_ = len(cf_bp)-1
 
-    mm = nc+mc+2
-    nn = max(np_+nc, mp_+mc)
+    if mpd == 1:
+        mct = mc
+        mcd = 1
+    else:
+        if len(mc) != mpd:
+            print("dimension mismatch for Bp and Bc.")
+        mct = sum(mc)
+        mcd = len(mc)
 
-    ng = len(gr)
+    nk = (nc+1) + (mct+mcd)  # number of parameters
+    nt = max(np_+nc, np.max(np.array(mp_)+np.array(mc)))
+
+    ncp = nk+1  # number of coefficient based on parameters
+    ncg = ng+2  # number of coefficient based on gammas
+
+    if ncg < ncp:
+        print(f"Error: ncg ({ncg})< ncp ({ncp})")
+        return None
+
+    if nt < nk:
+        print(f"Error: nt ({nt})< nk ({nk})")
+        return None
+
     v = np.cumprod(np.cumprod(gr))
     eta = 1/np.flip(v)
 
-    aab = np.r_[eta, 1, 1]
-    aacc = aab[ng+1-mm:ng+2]
+    aref_n = np.r_[eta, 1, 1]
+    aref_p = aref_n[ncg-ncp:ncg]
 
-    pp = np.zeros((mm, nn+1))
+    M = np.zeros((nk, ncp))
 
     for k in range(nc+1):
-        pp[k, k:k+np_+1] = cf_ap
+        M[k, k:k+np_+1] = cf_ap
 
-    for k in range(mc+1):
-        i0 = k + nn - mc
-        pp[k+nc+1, i0:i0+mp_+1] = cf_bp
+    if mpd == 1:
+        for k in range(mc+1):
+            i0 = k+nt-(mc+mp_)
+            M[k+nc+1, i0:i0+mp_+1] = cf_bp
+    else:
+        k0 = 0
+        for j in range(mpd):
+            cf_bp = Bp[j].num[0][0]
+            for k in range(0, mc[j]+1):
+                i0 = k+nt-(mc[j]+mp_[j])
+                M[k+k0+nc+1, i0:i0+mp_[j]+1] = cf_bp
+            k0 += mc[j]+1
 
-    ppc = pp[:, nn-mm:nn+1]
-    aac = np.r_[np.zeros(mm), 1]
-    ppd = np.r_[1, np.zeros(mm-2), 1, 0]
-    ppmm = np.vstack((ppc, ppd))
-    aacm = np.linalg.lstsq(ppmm, aac)[0]
-    v = aacc * aacm
-    # aa = ut.tf(v, 1)
+    Mc = M[:, nt-nk:nt+1]
+    b = np.r_[np.zeros(nk), 1]
+    ppd = np.r_[1, np.zeros(nk-2), 1, 0]
+    Mce = np.r_[Mc, [ppd]]
+
+    # c = np.linalg.lstsq(Mce, aac, rcond=None)[0]
+    c = np.linalg.solve(Mce, b)
+    v = aref_p*c
     tau = np.roots(v)
-
+    tau = tau[(tau > 0.0) & (tau < tau_max)]
     return tau
