@@ -31,8 +31,8 @@ k1, k0 = Bc.num[0][0]
 Ba = k0
 
 # plot CDM
-opt_p = [k1*Bp*s, k0*Bp, Ap]
-leg_opt_p = ['$k_1B_ps$', '$k_0B_p$', '$A_p$']
+opt_p = [Bc*Bp, Ac*Ap]
+leg_opt_p = ['$B_cB_p$', '$A_cA_p$']
 cdia(P, opt_p, leg_opt_p)
 
 # plot closed-loop step response
